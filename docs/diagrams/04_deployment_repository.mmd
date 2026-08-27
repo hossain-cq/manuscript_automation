@@ -1,0 +1,48 @@
+flowchart TB
+  HOST[Local Workstation / Server]
+  UI[Web UI / CLI]
+  CORE[manuscript-core environment\nAPI • orchestrator • schemas • policy]
+  WORK[agent-work environment\nliterature • writing • review • QA]
+  SCI[scientific-tools environment\nNumPy • SciPy • ASE • pymatgen • domain parsers]
+  LLM[local-llm environment\nmodel runtime • tokenizer • inference]
+  DOC[document-tools environment\nLaTeX • Pandoc • PDF parsing • rendering]
+  DB[(PostgreSQL / SQLite project DB)]
+  OBJ[(Filesystem artifact store\ncontent-addressed + immutable raw/)]
+  IDX[(Vector index)]
+  OBS[Structured logs + audit events]
+  GIT[Git repository + DVC/LFS or equivalent]
+  EXT[Optional network adapters\nmetadata APIs only, allowlisted]
+
+  HOST --> UI
+  HOST --> CORE
+  HOST --> WORK
+  HOST --> SCI
+  HOST --> LLM
+  HOST --> DOC
+  CORE <--> DB
+  CORE <--> OBJ
+  CORE <--> OBS
+  CORE <--> GIT
+  WORK <--> DB
+  WORK <--> OBJ
+  WORK <--> IDX
+  WORK --> LLM
+  WORK --> SCI
+  WORK --> DOC
+  CORE --> EXT
+
+  subgraph REPO[Repository Boundaries]
+    AG[agents/]
+    DOMAIN[domain/\nclaim • evidence • manuscript • journal]
+    INFRA[infra/\nstorage • queue • model gateway • adapters]
+    CFG[configs/ • schemas/ • prompts/]
+    TEST[tests/ • fixtures/ • golden cases]
+    PROJ[projects/<project_id>/\nraw • artifacts • reports • releases]
+  end
+
+  CORE --> DOMAIN
+  WORK --> AG
+  CORE --> INFRA
+  CORE --> CFG
+  CORE --> TEST
+  OBJ --> PROJ

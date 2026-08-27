@@ -1,0 +1,40 @@
+flowchart LR
+  subgraph SOURCES[Authoritative Sources]
+    UI[Explicit User Input]
+    EXP[Experimental Data]
+    COMP[Computational Outputs]
+    PAP[Verified Literature]
+    FIG[Figures / Tables]
+    CODE[Code + Environment Lockfiles]
+  end
+
+  ING[Ingestion + Normalization\nchecksums • MIME/type • schema • metadata]
+  EXTRACT[Evidence Extraction\nvalues • methods • passages • equations]
+  CLAIM[Claim Registry\nclaim_id • type • text • status]
+  LINK[Evidence Linker\nsource IDs • locations • transformations]
+  VERIFY[Verification Services\nDOI • units • equations • statistics • consistency]
+  DECIDE[Human Decision Gate\napprove • revise • reject • override]
+  MAN[Manuscript Blocks\nparagraphs • captions • equations]
+  LEDGER[(Append-only Provenance Ledger)]
+  GRAPH[(Knowledge Graph)]
+  REPORT[Audit Reports\nclaim coverage • unsupported claims • confidence]
+
+  SOURCES --> ING --> EXTRACT
+  EXTRACT --> CLAIM
+  EXTRACT --> LINK
+  CLAIM --> LINK
+  LINK --> VERIFY --> DECIDE
+  DECIDE --> MAN
+  LINK --> LEDGER
+  CLAIM --> GRAPH
+  LINK --> GRAPH
+  VERIFY --> REPORT
+  DECIDE --> LEDGER
+  MAN --> REPORT
+
+  classDef source fill:#eef6ff,stroke:#2b6cb0
+  classDef control fill:#fff7e6,stroke:#b7791f
+  classDef store fill:#f0fff4,stroke:#2f855a
+  class UI,EXP,COMP,PAP,FIG,CODE source
+  class CLAIM,VERIFY,DECIDE control
+  class LEDGER,GRAPH store

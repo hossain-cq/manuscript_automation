@@ -1,0 +1,127 @@
+version: "1"
+
+journals:
+  nature:
+    display_name: "Nature"
+    publisher: "Springer Nature"
+    profile_version: "2026-08"
+    article_type: "research_article"
+    manuscript_structure:
+      required_sections:
+        - title
+        - summary
+        - introduction
+        - results
+        - discussion
+        - methods
+        - data_availability
+        - code_availability
+        - references
+      optional_sections:
+        - reporting_summary
+        - extended_data
+        - supplementary_information
+    writing_constraints:
+      summary_style: "Accessible, fully referenced summary paragraph for non-specialist readers."
+      main_text_style: "Concise, broad significance, clear distinction between observation and interpretation."
+      title_style: "Short, informative, specific, and understandable outside the narrow subfield."
+      avoid:
+        - "Unqualified claims of absolute novelty"
+        - "Unsupported causal language"
+        - "Excessive field-specific abbreviations"
+    citation:
+      style_id: "nature-numbered"
+      titles_required: true
+      citation_mode: "numbered"
+      references_sorted_by: "order_of_appearance"
+    validation:
+      require_claim_evidence_links: true
+      require_data_availability_statement: true
+      require_code_availability_statement_when_code_exists: true
+      human_review_required_before_release: true
+    source_urls:
+      - "https://www.nature.com/nature/for-authors/formatting-guide"
+      - "https://www.nature.com/nature/for-authors/initial-submission"
+
+  physical_review_letters:
+    display_name: "Physical Review Letters"
+    publisher: "American Physical Society"
+    profile_version: "2026-08"
+    article_type: "letter"
+    manuscript_structure:
+      required_sections:
+        - title
+        - abstract
+        - introduction
+        - results_and_discussion
+        - conclusion
+        - references
+      optional_sections:
+        - methods
+        - supplemental_material
+        - end_matter
+    writing_constraints:
+      abstract_style: "Focused statement of problem, main result, method, and significance."
+      main_text_style: "Compact Letter format; foreground the central physical result and its importance."
+      title_style: "Self-contained, concise, and informative; avoid unnecessary new terminology."
+      avoid:
+        - "Long review-style background sections"
+        - "Claims broader than the demonstrated physical system"
+        - "Unexplained notation or unsupported universality"
+    citation:
+      style_id: "aps-prl"
+      titles_required: false
+      citation_mode: "numbered"
+      references_sorted_by: "order_of_appearance"
+    validation:
+      require_claim_evidence_links: true
+      require_compact_main_text: true
+      require_end_matter_validation: true
+      human_review_required_before_release: true
+    source_urls:
+      - "https://journals.aps.org/prl/authors"
+      - "https://journals.aps.org/authors/style-basics"
+
+  advanced_quantum_technologies:
+    # Section list below is not from Wiley's public author guide - it's
+    # grounded in an actual accepted submission's structure
+    # (/home/user/Documents/wiley/revised_main.tex: \title, \begin{abstract},
+    # then \section{Introduction}, \section{Methodology},
+    # \section{Results and discussion}, \section{Conclusion},
+    # \section*{Acknowledgements}, \section*{Conflicts of interest}).
+    # Treat as a starting point for this one paper's shape, not Wiley's full
+    # house style - broaden once a second AQT submission is checked.
+    display_name: "Advanced Quantum Technologies"
+    publisher: "Wiley"
+    profile_version: "2026-08"
+    article_type: "research_article"
+    manuscript_structure:
+      required_sections:
+        - title
+        - abstract
+        - introduction
+        - methodology
+        - results_and_discussion
+        - conclusion
+        - acknowledgements
+        - conflicts_of_interest
+        - references
+      optional_sections:
+        - supporting_information
+    writing_constraints:
+      abstract_style: "Self-contained summary of problem, method, and central result."
+      main_text_style: "Structured IMRaD-style research article."
+      avoid:
+        - "Unsupported causal language"
+        - "Claims broader than the demonstrated system"
+    citation:
+      style_id: "aps-prl"
+      titles_required: false
+      citation_mode: "numbered"
+      references_sorted_by: "order_of_appearance"
+    validation:
+      require_claim_evidence_links: true
+      require_data_availability_statement: false
+      human_review_required_before_release: true
+    source_urls:
+      - "https://onlinelibrary.wiley.com/journal/25119044"

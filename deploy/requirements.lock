@@ -1,0 +1,14 @@
+# Replace hashes with the output of pip-compile --generate-hashes in the real repository.
+# This template is intentionally explicit; production builds must use a fully hashed lock file.
+langgraph==0.6.8
+langgraph-checkpoint-sqlite==2.0.11
+fastapi==0.116.1
+uvicorn[standard]==0.35.0
+pydantic==2.11.7
+openai==1.99.9
+requests==2.32.4
+pandas==2.3.1
+numpy==2.3.2
+matplotlib==3.10.5
+pytest==8.4.1
+httpx==0.28.1

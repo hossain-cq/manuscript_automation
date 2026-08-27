@@ -1,0 +1,257 @@
+name: manuscript-system-ci-cd
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: manuscript-system-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  validate:
+    name: Validate source, config, and tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: deploy/requirements.lock
+
+      - name: Install pinned dependencies
+        # The checked-in file is a pinned template. Before production use, replace
+        # it with a fully hash-locked file and restore --require-hashes here.
+        run: python -m pip install -r deploy/requirements.lock
+
+      - name: Compile Python modules
+        run: python -m compileall -q .
+
+      - name: Run unit and offline integration tests
+        run: python -m pytest -q
+        env:
+          # Tests must use fake providers and must not call production APIs.
+          MANUSCRIPT_TEST_MODE: 'true'
+          NETWORK_DISABLED: 'true'
+
+      - name: Validate Kubernetes YAML
+        uses: instrumenta/kubeval@v0.16.1
+        with:
+          files: deploy/k8s/manuscript-system.yaml
+          strict: true
+        continue-on-error: true
+
+      - name: Scan repository for accidentally committed secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  dependency-audit:
+    name: Dependency and filesystem audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run pip-audit
+        uses: pypa/gh-action-pip-audit@v1.1.0
+        with:
+          inputs: deploy/requirements.lock
+          ignore-vulns: ''
+      - name: Run Bandit
+        run: |
+          python -m pip install bandit
+          bandit -r . -x tests -ll
+
+  build:
+    name: Build and scan container
+    needs: [validate, dependency-audit]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+      image: ${{ steps.meta.outputs.tags }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR only for publishable refs
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile
+          push: ${{ github.event_name == 'push' }}
+          load: ${{ github.event_name == 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Scan built image with Trivy
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ steps.meta.outputs.tags }}
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+        if: github.event_name == 'push'
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.7.0
+        if: github.event_name == 'push'
+
+      - name: Sign image by keyless OIDC identity
+        if: github.event_name == 'push'
+        env:
+          COSIGN_EXPERIMENTAL: '1'
+        run: cosign sign --yes "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}"
+
+      - name: Generate artifact attestation
+        if: github.event_name == 'push'
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+  publish-sandbox-image:
+    name: Build and publish sandbox runner
+    needs: [validate, dependency-audit]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-sandbox-runner
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha,format=long
+      - name: Build and push sandbox image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: sandbox-runner
+          file: sandbox-runner/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ steps.meta.outputs.tags }}
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+      - uses: sigstore/cosign-installer@v3.7.0
+      - name: Sign sandbox image
+        env:
+          COSIGN_EXPERIMENTAL: '1'
+        run: cosign sign --yes "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-sandbox-runner@${{ steps.build.outputs.digest }}"
+
+  deploy-production:
+    name: Production deployment approval gate
+    needs: [build, publish-sandbox-image]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    environment:
+      name: production
+      url: https://manuscript.example.org
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify image signatures before deployment
+        uses: sigstore/cosign-installer@v3.7.0
+      - name: Verify API image signature
+        env:
+          COSIGN_EXPERIMENTAL: '1'
+        run: cosign verify "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build.outputs.digest }}"
+      - name: Render deployment image references
+        run: |
+          mkdir -p release
+          sed "s#manuscript-system:latest#${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build.outputs.digest }}#g" \
+            deploy/k8s/manuscript-system.yaml > release/manuscript-system.yaml
+      - name: Upload deployment manifest as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-manifest
+          path: release/manuscript-system.yaml
+
+# Production cluster deployment should be performed by a separately protected
+# deployment controller or environment-approved step. Do not place a long-lived
+# kubeconfig in repository secrets. If direct deployment is required, use short-
+# lived cloud OIDC credentials and a tightly scoped service account.

@@ -1,0 +1,63 @@
+flowchart TB
+  U[Researcher / Human Approver]
+  UI[Local Web UI / CLI]
+  API[Application API]
+  WF[Workflow Engine\nstate machine + retries + gates]
+  POL[Policy & Integrity Engine\npermissions, claim rules, override records]
+  BUS[Event Bus / Task Queue]
+  REG[Agent Registry & Capability Catalog]
+
+  subgraph AGENTS[Agent Execution Plane]
+    PM[Project Manager]
+    LIT[Literature Discovery + Analysis]
+    DATA[Data / Results Ingestion]
+    SCI[Scientific Analysis]
+    PLAN[Manuscript Planner]
+    WRITE[Section Writers]
+    FIG[Figure / Table Agent]
+    CITE[Citation Auditor]
+    QA[Scientific QA Agents\nFact • Equation • Consistency • Reproducibility]
+    PUB[Publication QA\nLanguage • Proof • Similarity • Journal]
+    REV[Peer Review + Revision]
+    PKG[Submission Package Generator]
+  end
+
+  subgraph EVIDENCE[Evidence & Artifact Plane]
+    RAW[(Immutable Raw Data / Papers)]
+    ART[(Versioned Artifact Store)]
+    DB[(Structured Project DB)]
+    VEC[(Vector Index)]
+    GRAPH[(Claim–Evidence–Citation Graph)]
+    PROV[(Provenance Ledger)]
+    GIT[(Git / DVC / Release Tags)]
+  end
+
+  subgraph SERVICES[Scientific & External Services]
+    SANDBOX[Domain Tool Sandboxes\nDFT • QM • ML • Statistics]
+    MODEL[Model Gateway\nlocal LLMs • embeddings • rerankers]
+    META[Metadata Adapters\nCrossref • OpenAlex • PubMed • Semantic Scholar]
+    RENDER[Document / Figure Renderers\nLaTeX • Pandoc • Jinja2]
+  end
+
+  U --> UI --> API --> WF
+  API --> POL
+  WF --> REG --> BUS
+  BUS --> AGENTS
+  POL --> AGENTS
+  AGENTS --> DB
+  AGENTS --> ART
+  AGENTS --> GRAPH
+  AGENTS --> PROV
+  RAW --> DATA
+  RAW --> LIT
+  DB <--> VEC
+  DB <--> GRAPH
+  ART --> GIT
+  AGENTS --> MODEL
+  LIT --> META
+  DATA --> SANDBOX
+  SCI --> SANDBOX
+  PKG --> RENDER --> ART
+  WF --> UI
+  PROV --> UI
+  POL --> U

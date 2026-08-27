@@ -1,0 +1,5 @@
+app:
+  name: manuscript-system
+  database_path: ./projects/managed/manuscript_system.sqlite
+  checkpoint_path: ./projects/managed/checkpoints.sqlite
+  artifact_store_path: ./projects/managed/artifacts

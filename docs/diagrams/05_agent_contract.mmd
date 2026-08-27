@@ -1,0 +1,26 @@
+sequenceDiagram
+  participant W as Workflow Engine
+  participant P as Policy Engine
+  participant A as Agent
+  participant S as Schema Validator
+  participant E as Evidence Store
+  participant L as Provenance Ledger
+  participant H as Human Reviewer
+
+  W->>P: authorize(task, inputs, capabilities)
+  P-->>W: permit / deny / human-gate-required
+  W->>A: TaskEnvelope(input_artifact_ids, schema_version, constraints)
+  A->>E: read immutable inputs
+  A->>A: execute in bounded environment
+  A->>S: AgentResult(output, evidence, confidence, warnings)
+  S-->>A: valid / invalid with errors
+  A->>L: record inputs, model, prompt hash, code version, output hash
+  A-->>W: validated result or explicit failure
+  W->>P: evaluate integrity rules
+  P-->>W: continue / revise / block
+  W->>H: approval request when required
+  H-->>W: approve / reject / request revision
+  W->>E: commit versioned output artifact
+
+  Note over A,L: Agents propose artifacts, they do not silently mutate raw data.
+  Note over P,H: Human overrides are explicit, scoped, and auditable.

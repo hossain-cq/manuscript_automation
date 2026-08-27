@@ -1,0 +1,84 @@
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: manuscript-system:dev
+    command: ["python", "-m", "src.api"]
+    read_only: true
+    user: "10001:10001"
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=512m
+    environment:
+      DATABASE_URL: postgresql://manuscript:${POSTGRES_PASSWORD}@postgres:5432/manuscript
+      ARTIFACT_ROOT: /var/lib/manuscript/artifacts
+      CHECKPOINT_URL: postgresql://manuscript:${POSTGRES_PASSWORD}@postgres:5432/manuscript
+      SANDBOX_SUBMIT_URL: http://runner:8090
+      OPENAI_API_BASE: ${OPENAI_API_BASE}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - artifact_data:/var/lib/manuscript/artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+      runner:
+        condition: service_started
+    networks: [control]
+
+  runner:
+    build:
+      context: ../sandbox-runner
+      dockerfile: Dockerfile
+    image: manuscript-sandbox-runner:dev
+    command: ["python", "-m", "runner.api"]
+    read_only: true
+    user: "10001:10001"
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=1g
+      - /workspace:rw,noexec,nosuid,size=20g
+    environment:
+      ARTIFACT_ROOT: /var/lib/manuscript/artifacts
+      RUNNER_PROFILE_DIR: /etc/manuscript/profiles
+      RUNNER_NETWORK_DISABLED: "true"
+    volumes:
+      - artifact_data:/var/lib/manuscript/artifacts:ro
+      - runner_profiles:/etc/manuscript/profiles:ro
+    networks:
+      - control
+      - sandbox
+    # Do not mount /var/run/docker.sock, host home directories, SSH keys,
+    # cloud credentials, or arbitrary project folders.
+
+  postgres:
+    image: postgres:16.4-alpine
+    environment:
+      POSTGRES_DB: manuscript
+      POSTGRES_USER: manuscript
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U manuscript -d manuscript"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [control]
+
+networks:
+  control:
+    internal: true
+  sandbox:
+    internal: true
+
+volumes:
+  postgres_data:
+  artifact_data:
+  runner_profiles:

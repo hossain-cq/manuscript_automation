@@ -1,0 +1,41 @@
+flowchart TB
+  USER[Researcher provides project path and objective]
+  GUARD[Consent + read-only boundary\npath validation • exclusions • checksum policy]
+  SCAN[Project Discovery\nfiles • folders • metadata • code • notebooks • logs]
+  CLASS[Domain and workflow classification\nDFT/materials • AI/ML • quantum • other]
+  MAP[Project Knowledge Map\nmethods • datasets • runs • results • figures • tables • references]
+  RECON[Workflow Reconstruction\nwhat was attempted • what actually ran • dependencies]
+  AUDIT[Research Audit]
+  NOV[Novelty / Impact Audit\nliterature gap • contribution candidates • journal scope]
+  EVI[Evidence Sufficiency Audit\nclaims • controls • baselines • uncertainty • figures/tables]
+  METH[Methodology Audit\nparameters • convergence • validation • reproducibility]
+  CONS[Consistency Audit\ncode • outputs • plots • text • units • numbers]
+  REP[Readiness Report\nREADY • DRAFTABLE WITH WARNINGS • NEEDS WORK • INSUFFICIENT EVIDENCE]
+  HUMAN[Human review of assessment]
+  PLAN[Manuscript plan\nclaims • outline • journal profile • missing-evidence tasks]
+  COMPLETE[Research completion plan\nadditional runs • experiments • analyses • documentation]
+  WRITE[Controlled manuscript pipeline]
+  QA[Scientific QA + publication QA]
+  RELEASE[Human-approved release package]
+
+  USER --> GUARD --> SCAN --> CLASS --> MAP --> RECON --> AUDIT
+  AUDIT --> NOV
+  AUDIT --> EVI
+  AUDIT --> METH
+  AUDIT --> CONS
+  NOV --> REP
+  EVI --> REP
+  METH --> REP
+  CONS --> REP
+  REP --> HUMAN
+  HUMAN -->|Approved and sufficient| PLAN --> WRITE --> QA --> RELEASE
+  HUMAN -->|Promising but incomplete| COMPLETE --> MAP
+  HUMAN -->|Insufficient evidence| COMPLETE
+  HUMAN -->|Reject / re-scan| SCAN
+
+  classDef gate fill:#fff7e6,stroke:#b7791f
+  classDef audit fill:#eef6ff,stroke:#2b6cb0
+  classDef store fill:#f0fff4,stroke:#2f855a
+  class GUARD,HUMAN gate
+  class NOV,EVI,METH,CONS audit
+  class MAP,REP,RELEASE store

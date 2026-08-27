@@ -1,0 +1,7 @@
+{
+  "dependencies": ["./src"],
+  "graphs": {
+    "assessment": "./src/manuscript_system/graphs/studio_entry.py:graph"
+  },
+  "env": ".env"
+}

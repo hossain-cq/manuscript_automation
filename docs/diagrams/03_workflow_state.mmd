@@ -1,0 +1,38 @@
+stateDiagram-v2
+  [*] --> PROJECT_CREATED
+  PROJECT_CREATED --> DATA_INGESTED: manifest validated
+  DATA_INGESTED --> LITERATURE_READY: sources indexed
+  DATA_INGESTED --> BLOCKED: corrupt/missing data
+  LITERATURE_READY --> ANALYSIS_READY: literature + evidence matrix complete
+  ANALYSIS_READY --> PLAN_READY: research questions and claims mapped
+  PLAN_READY --> DRAFTING: human approves scope and outline
+  DRAFTING --> SCIENTIFIC_REVIEW: draft candidate emitted
+  SCIENTIFIC_REVIEW --> REVISION: findings accepted or require changes
+  REVISION --> SCIENTIFIC_REVIEW: changes need re-review
+  SCIENTIFIC_REVIEW --> CITATION_AUDIT: no blocking scientific findings
+  CITATION_AUDIT --> FACT_CHECK: citation graph passes threshold
+  CITATION_AUDIT --> REVISION: unsupported/weak claims
+  FACT_CHECK --> LANGUAGE_EDIT: no critical fact errors
+  FACT_CHECK --> REVISION: critical contradiction or fabricated metadata
+  LANGUAGE_EDIT --> JOURNAL_FORMAT: semantic diff approved
+  JOURNAL_FORMAT --> SIMILARITY_CHECK: target profile applied
+  SIMILARITY_CHECK --> FINAL_PROOF: findings classified and reviewed
+  SIMILARITY_CHECK --> REVISION: material unattributed overlap
+  FINAL_PROOF --> HUMAN_APPROVAL: readiness report generated
+  HUMAN_APPROVAL --> SUBMISSION_PACKAGE: author explicitly approves
+  HUMAN_APPROVAL --> REVISION: author requests changes
+  SUBMISSION_PACKAGE --> [*]
+  BLOCKED --> DATA_INGESTED: issue resolved
+
+  note right of HUMAN_APPROVAL
+    Mandatory human gate:
+    conclusions, new numbers,
+    uncertain references,
+    submission, response letter
+  end note
+
+  note right of BLOCKED
+    No silent fallback.
+    Emit error, evidence,
+    remediation action.
+  end note

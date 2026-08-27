@@ -1,0 +1,288 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: manuscript-system
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: manuscript-api
+  namespace: manuscript-system
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sandbox-runner
+  namespace: manuscript-system
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: manuscript-secrets
+  namespace: manuscript-system
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: replace-me
+  OPENAI_API_KEY: replace-me
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: manuscript-config
+  namespace: manuscript-system
+data:
+  OPENAI_API_BASE: "https://api.openai.com/v1"
+  ARTIFACT_ROOT: "/var/lib/manuscript/artifacts"
+  CHECKPOINT_URL: "postgresql://manuscript:$(POSTGRES_PASSWORD)@postgres:5432/manuscript"
+  SANDBOX_SUBMIT_URL: "http://sandbox-runner:8090"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: manuscript-artifacts
+  namespace: manuscript-system
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: manuscript-postgres
+  namespace: manuscript-system
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 50Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: manuscript-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: postgres}
+  template:
+    metadata:
+      labels: {app: postgres}
+    spec:
+      serviceAccountName: manuscript-api
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: postgres
+          image: postgres:16.4-alpine
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POSTGRES_DB
+              value: manuscript
+            - name: POSTGRES_USER
+              value: manuscript
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: manuscript-secrets, key: POSTGRES_PASSWORD}
+          ports: [{containerPort: 5432}]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: ["ALL"]}
+            readOnlyRootFilesystem: false
+          volumeMounts:
+            - {name: postgres-data, mountPath: /var/lib/postgresql/data}
+          resources:
+            requests: {cpu: "100m", memory: "256Mi"}
+            limits: {cpu: "1", memory: "2Gi"}
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim: {claimName: manuscript-postgres}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: manuscript-system
+spec:
+  selector: {app: postgres}
+  ports: [{port: 5432, targetPort: 5432}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: manuscript-api
+  namespace: manuscript-system
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: manuscript-api}
+  template:
+    metadata:
+      labels: {app: manuscript-api}
+    spec:
+      serviceAccountName: manuscript-api
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: api
+          image: manuscript-system:latest
+          imagePullPolicy: IfNotPresent
+          ports: [{containerPort: 8080}]
+          envFrom:
+            - configMapRef: {name: manuscript-config}
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: manuscript-secrets, key: POSTGRES_PASSWORD}
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef: {name: manuscript-secrets, key: OPENAI_API_KEY}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: ["ALL"]}
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - {name: artifacts, mountPath: /var/lib/manuscript/artifacts}
+            - {name: tmp, mountPath: /tmp}
+          readinessProbe:
+            httpGet: {path: /health/ready, port: 8080}
+          livenessProbe:
+            httpGet: {path: /health/live, port: 8080}
+          resources:
+            requests: {cpu: "250m", memory: "512Mi"}
+            limits: {cpu: "2", memory: "4Gi"}
+      volumes:
+        - name: artifacts
+          persistentVolumeClaim: {claimName: manuscript-artifacts}
+        - name: tmp
+          emptyDir: {medium: Memory, sizeLimit: 512Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: manuscript-api
+  namespace: manuscript-system
+spec:
+  selector: {app: manuscript-api}
+  ports: [{port: 8080, targetPort: 8080}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sandbox-runner
+  namespace: manuscript-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: sandbox-runner}
+  template:
+    metadata:
+      labels: {app: sandbox-runner}
+    spec:
+      serviceAccountName: sandbox-runner
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: runner
+          image: manuscript-sandbox-runner:latest
+          imagePullPolicy: IfNotPresent
+          ports: [{containerPort: 8090}]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: ["ALL"]}
+            readOnlyRootFilesystem: true
+          env:
+            - name: NETWORK_DISABLED
+              value: "true"
+            - name: ARTIFACT_ROOT
+              value: /var/lib/manuscript/artifacts
+          volumeMounts:
+            - {name: artifacts, mountPath: /var/lib/manuscript/artifacts, readOnly: true}
+            - {name: workspace, mountPath: /workspace}
+            - {name: tmp, mountPath: /tmp}
+          resources:
+            requests: {cpu: "500m", memory: "1Gi"}
+            limits: {cpu: "8", memory: "32Gi", ephemeral-storage: "30Gi"}
+      volumes:
+        - name: artifacts
+          persistentVolumeClaim: {claimName: manuscript-artifacts}
+        - name: workspace
+          emptyDir: {sizeLimit: 30Gi}
+        - name: tmp
+          emptyDir: {medium: Memory, sizeLimit: 1Gi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sandbox-runner
+  namespace: manuscript-system
+spec:
+  selector: {app: sandbox-runner}
+  ports: [{port: 8090, targetPort: 8090}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: manuscript-system
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-egress
+  namespace: manuscript-system
+spec:
+  podSelector: {matchLabels: {app: manuscript-api}}
+  policyTypes: [Egress]
+  egress:
+    - to: [{podSelector: {matchLabels: {app: postgres}}}]
+      ports: [{protocol: TCP, port: 5432}]
+    - to: [{podSelector: {matchLabels: {app: sandbox-runner}}}]
+      ports: [{protocol: TCP, port: 8090}]
+    # Add an explicit egress policy for the LLM provider or proxy. Do not use
+    # 0.0.0.0/0 for the runner. Network policy support varies by CNI.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: runner-no-egress
+  namespace: manuscript-system
+spec:
+  podSelector: {matchLabels: {app: sandbox-runner}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from: [{podSelector: {matchLabels: {app: manuscript-api}}}]
+      ports: [{protocol: TCP, port: 8090}]
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: manuscript-api
+  namespace: manuscript-system
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: {app: manuscript-api}

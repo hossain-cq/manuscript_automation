@@ -1,0 +1,30 @@
+# Blocking-rule table adapted from docs/LangGraph Implementation Specification.md,
+# section 18. Not enforced in code yet — Phase 0 has no LLM-driven or
+# claim-generating nodes for a policy engine to police. This file exists so
+# Phase 1+ policy checks read from one declarative source instead of being
+# scattered across node implementations.
+rules:
+  - rule_id: raw_source_mutation
+    condition: "Raw source checksum changed after ingestion"
+    action: BLOCK
+  - rule_id: fabricated_doi
+    condition: "Unverifiable or fabricated DOI"
+    action: BLOCK
+  - rule_id: central_claim_without_evidence
+    condition: "Central claim has no linked evidence"
+    action: BLOCK
+  - rule_id: figure_contradicts_claim
+    condition: "Figure contradicts a central numerical claim"
+    action: BLOCK
+  - rule_id: unverified_new_number
+    condition: "Model proposes a number not present in evidence"
+    action: BLOCK
+  - rule_id: interpretation_as_fact
+    condition: "Interpretation presented as an established fact"
+    action: REQUIRE_REVISION
+  - rule_id: similarity_detected
+    condition: "Text similarity found against another source"
+    action: REPORT_ONLY
+  - rule_id: submission_requested
+    condition: "Any action that would submit externally"
+    action: BLOCK

@@ -1,0 +1,80 @@
+version: "1"
+
+styles:
+  nature-numbered:
+    description: "Nature-style numbered references; verify against the current target-journal guide before submission."
+    in_text:
+      mode: "superscript_number"
+      range_separator: "–"
+      list_separator: ","
+      example: "... as previously reported.¹–³"
+    bibliography:
+      order: "order_of_appearance"
+      include_article_title: true
+      author_format: "Surname, Initials"
+      max_authors_before_etal: 6
+      et_al: "et al."
+      journal_abbreviation: "use_standard_abbreviation_when_available"
+      year_format: "YYYY"
+      volume_format: "volume"
+      pages_format: "first-last_or_article_number"
+      doi_format: "https://doi.org/DOI"
+      templates:
+        journal_article: "{authors}. {title}. {journal} {volume}, {pages} ({year}). {doi}"
+        book: "{authors}. {title} ({publisher}, {year})."
+        web: "{authors_or_organization}. {title}. {url} (accessed {access_date})."
+    validation:
+      require_title: true
+      require_doi_when_available: true
+      require_access_date_for_web: true
+      no_unverified_reference: true
+
+  aps-prl:
+    description: "APS/Physical Review Letters numbered reference style; verify current PRL and APS style instructions before submission."
+    in_text:
+      mode: "bracketed_number"
+      range_separator: "–"
+      list_separator: ","
+      example: "... as previously reported [1–3]."
+    bibliography:
+      order: "order_of_appearance"
+      include_article_title: false
+      author_format: "Initials Surname"
+      max_authors_before_etal: 10
+      et_al: "et al."
+      journal_abbreviation: "standard_physical_review_abbreviation"
+      year_format: "YYYY"
+      volume_format: "volume"
+      pages_format: "article_number_or_pages"
+      doi_format: "https://doi.org/DOI"
+      templates:
+        journal_article: "{authors}, {journal} {volume}, {pages} ({year})."
+        journal_article_with_doi: "{authors}, {journal} {volume}, {pages} ({year}), {doi}."
+        book: "{authors}, {title} ({publisher}, {year})."
+        web: "{authors_or_organization}, {title}, {url} (accessed {access_date})."
+    validation:
+      require_title: false
+      require_doi_when_available: true
+      require_access_date_for_web: true
+      no_unverified_reference: true
+
+# The following examples are illustrative records used to test rendering. They
+# are not evidence for a real manuscript and must be replaced by verified records.
+examples:
+  nature-numbered:
+    - reference_id: "REF-EXAMPLE-1"
+      authors: "Author A., Author B."
+      title: "Verified article title"
+      journal: "Example Journal"
+      volume: "12"
+      pages: "100-110"
+      year: 2025
+      doi: "https://doi.org/10.0000/example"
+  aps-prl:
+    - reference_id: "REF-EXAMPLE-2"
+      authors: "A. Author and B. Author"
+      journal: "Phys. Rev. Lett."
+      volume: "135"
+      pages: "012345"
+      year: 2025
+      doi: "https://doi.org/10.0000/example2"

@@ -1,0 +1,64 @@
+# Seeded from a real project, not invented: /home/user/Hossain/AQT_electrolyte
+# ("Quantum Simulation of Battery Electrolyte Salts", Advanced Quantum
+# Technologies, DOI 10.1002/qute.202500871) — VQE/UCCSD, VQE-qEOM, SQD
+# (Qiskit/ffsim), CASCI benchmarks (PySCF). This is quantum chemistry +
+# quantum computing, not plane-wave DFT/VASP.
+domain_profile:
+  domain_id: quantum_chemistry
+  label: "Quantum chemistry & quantum computing for molecular/materials systems"
+  seeded_from: /home/user/Hossain/AQT_electrolyte
+
+  method_vocabulary:
+    - VQE
+    - UCCSD
+    - VQE-qEOM
+    - SQD
+    - CASCI
+    - active space
+    - basis set convergence
+    - dissociation curve
+    - excited state
+    - qubit count
+
+  expected_artifact_types:
+    - extension: .dat
+      description: raw energy / dissociation-curve tables
+    - extension: .csv
+      description: basis-set convergence or fixed-geometry energy tables
+    - extension: .ipynb
+      description: per-molecule calculation notebooks
+    - extension: [.jpg, .png]
+      description: result figures (results/figures/ convention)
+    - extension: .yaml
+      description: run configuration (config.yaml convention)
+
+  completeness_checklist:
+    - id: dissociation_curves
+      description: >
+        Ground-state dissociation curves per system, benchmarked against a
+        classical method (e.g. CASCI)
+      keywords: [dissociation]
+      importance: CENTRAL
+    - id: basis_set_convergence
+      description: "Energy convergence across at least two basis sets"
+      keywords: [basis]
+      importance: CENTRAL
+    - id: qubit_vs_energy
+      description: "Accuracy/cost tradeoff as qubit count changes"
+      keywords: [qubit]
+      importance: SUPPORTING
+    - id: excited_states
+      description: "Excited-state energies where claimed (e.g. VQE-qEOM)"
+      keywords: [excit]
+      importance: SUPPORTING
+    - id: sqd_convergence
+      description: "SQD convergence plot when sample-based diagonalization is used"
+      keywords: [sqd]
+      importance: CENTRAL
+
+  notes: >
+    Seeded from a single real, published project. Treat this checklist as a
+    starting point, not a general quantum-chemistry standard — broaden it once
+    a second project in this domain is assessed. classify_domain and
+    run_audits in graphs/assessment.py now read this file for real (see
+    graphs/evidence_extraction.py) instead of hard-coding "quantum_chemistry".
