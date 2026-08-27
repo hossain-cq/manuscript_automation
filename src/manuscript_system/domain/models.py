@@ -242,6 +242,21 @@ class PeerReviewRound(StrictModel):
     created_at: str = Field(default_factory=utc_now)
 
 
+class ReleaseCandidate(StrictModel):
+    release_id: str
+    project_id: str
+    manuscript_plan_id: str | None = None
+    readiness_report_id: str | None = None
+    completion_plan_id: str | None = None
+    peer_review_round_id: str | None = None
+    section_count: int = 0
+    drafted_section_count: int = 0
+    citation_count: int = 0
+    human_decision_count: int = 0
+    package_hash: str = ""
+    created_at: str = Field(default_factory=utc_now)
+
+
 class ReadinessReport(StrictModel):
     report_id: str
     project_id: str

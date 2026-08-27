@@ -12,6 +12,7 @@ over from manuscriptctl.py so a future HTTP-backed version is a drop-in swap.
 import argparse
 import json
 import sys
+from pathlib import Path
 from typing import Any
 
 from langgraph.types import Command
@@ -34,11 +35,12 @@ from .graphs.manuscript_review import (
     build_manuscript_review_graph,
     initial_state as review_initial_state,
 )
-from .domain.models import PeerReviewRound
+from .domain.models import HumanDecision, PeerReviewRound
 from .persistence.database import connect
 from .persistence.repositories import Repository, new_id
 from .settings import get_settings
 from .tools.journals import load_journal_profile
+from .tools.release_package import assemble_release_package
 
 
 def _print(payload: dict[str, Any]) -> None:
@@ -281,6 +283,13 @@ def cmd_approve_draft(args: argparse.Namespace) -> None:
     print(f"thread_id: {args.thread_id}")
     print(f"status:    {result.get('draft_status')}")
 
+    run = repo.get_run_by_thread_id(args.thread_id)
+    if run is not None:
+        repo.add_human_decision(HumanDecision(
+            decision_id=new_id("DECISION"), project_id=run.project_id, run_id=run.run_id,
+            kind="DRAFT_REVIEW", decision=args.decision,
+        ))
+
 
 def _print_review_result(result: dict[str, Any]) -> None:
     reports = result.get("review_reports") or []
@@ -375,9 +384,13 @@ def cmd_approve_review(args: argparse.Namespace) -> None:
     print(f"status:    {result.get('terminal_status')}")
     _print_review_result(result)
 
-    if result.get("terminal_status") in {"SUCCEEDED", "BLOCKED"}:
-        run = repo.get_run_by_thread_id(args.thread_id)
-        if run is not None:
+    run = repo.get_run_by_thread_id(args.thread_id)
+    if run is not None:
+        repo.add_human_decision(HumanDecision(
+            decision_id=new_id("DECISION"), project_id=run.project_id, run_id=run.run_id,
+            kind="REVIEW_GATE", decision=args.decision,
+        ))
+        if result.get("terminal_status") in {"SUCCEEDED", "BLOCKED"}:
             plan = repo.get_manuscript_plan(run.project_id)
             repo.add_peer_review_round(PeerReviewRound(
                 round_id=new_id("REVIEWROUND"), project_id=run.project_id,
@@ -391,6 +404,26 @@ def cmd_approve_review(args: argparse.Namespace) -> None:
         print()
         print("Waiting for human review. Choices:", ", ".join(REVIEW_CHOICES))
         print(f"Resume with: manuscript-system approve-review --thread-id {args.thread_id} --decision <choice>")
+
+
+def cmd_export_release(args: argparse.Namespace) -> None:
+    settings = get_settings()
+    repo = Repository(connect(settings.database_path))
+
+    candidate, markdown = assemble_release_package(repo, args.project_id, settings.checkpoint_path)
+    repo.add_release_candidate(candidate)
+
+    output_path = Path(args.output) if args.output else Path("release") / f"{args.project_id}-release.md"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(markdown, encoding="utf-8")
+
+    print(f"release_id: {candidate.release_id}")
+    print(f"project_id: {args.project_id}")
+    print(f"sections:   {candidate.drafted_section_count}/{candidate.section_count} drafted")
+    print(f"citations:  {candidate.citation_count}")
+    print(f"decisions:  {candidate.human_decision_count}")
+    print(f"package_hash: {candidate.package_hash}")
+    print(f"written to: {output_path}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -462,6 +495,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="the review graph has 3 human gates with different choice sets - pass whichever this thread is paused at",
     )
     approve_review.set_defaults(func=cmd_approve_review)
+
+    export_release = sub.add_parser(
+        "export-release",
+        help="assemble everything a project has produced into one Markdown release snapshot (deterministic, no LLM)",
+    )
+    export_release.add_argument("--project-id", required=True)
+    export_release.add_argument(
+        "--output", default=None, help="output path (default: ./release/<project_id>-release.md)",
+    )
+    export_release.set_defaults(func=cmd_export_release)
 
     return parser
 

@@ -23,6 +23,7 @@ from ..domain.models import (
     Project,
     ProjectKnowledgeMap,
     ReadinessReport,
+    ReleaseCandidate,
     Run,
     SourceAsset,
 )
@@ -58,6 +59,15 @@ class Repository:
         )
         self.conn.commit()
         return project
+
+    def get_project(self, project_id: str) -> Project | None:
+        row = self.conn.execute("SELECT * FROM projects WHERE project_id = ?", (project_id,)).fetchone()
+        if row is None:
+            return None
+        return Project(
+            project_id=row["project_id"], source_path=row["source_path"],
+            domain_profile_id=row["domain_profile_id"], created_at=row["created_at"],
+        )
 
     def add_source_assets(self, assets: list[SourceAsset]) -> None:
         if not assets:
@@ -395,6 +405,17 @@ class Repository:
         self.conn.commit()
         return plan.plan_id
 
+    def get_completion_plan(self, project_id: str) -> CompletionPlan | None:
+        row = self.conn.execute(
+            "SELECT * FROM completion_plans WHERE project_id = ? ORDER BY created_at DESC LIMIT 1", (project_id,)
+        ).fetchone()
+        if row is None:
+            return None
+        return CompletionPlan(
+            plan_id=row["plan_id"], project_id=row["project_id"], run_id=row["run_id"],
+            task_ids=json.loads(row["task_ids"]), created_at=row["created_at"],
+        )
+
     def add_planned_sections(self, sections: list[PlannedSection]) -> None:
         if not sections:
             return
@@ -495,6 +516,36 @@ class Repository:
             for row in rows
         ]
 
+    def add_release_candidate(self, candidate: ReleaseCandidate) -> str:
+        self.conn.execute(
+            "INSERT INTO release_candidates "
+            "(release_id, project_id, manuscript_plan_id, readiness_report_id, completion_plan_id, "
+            "peer_review_round_id, section_count, drafted_section_count, citation_count, "
+            "human_decision_count, package_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (candidate.release_id, candidate.project_id, candidate.manuscript_plan_id,
+             candidate.readiness_report_id, candidate.completion_plan_id, candidate.peer_review_round_id,
+             candidate.section_count, candidate.drafted_section_count, candidate.citation_count,
+             candidate.human_decision_count, candidate.package_hash, candidate.created_at),
+        )
+        self.conn.commit()
+        return candidate.release_id
+
+    def get_release_candidates(self, project_id: str) -> list[ReleaseCandidate]:
+        rows = self.conn.execute(
+            "SELECT * FROM release_candidates WHERE project_id = ? ORDER BY created_at", (project_id,)
+        ).fetchall()
+        return [
+            ReleaseCandidate(
+                release_id=row["release_id"], project_id=row["project_id"],
+                manuscript_plan_id=row["manuscript_plan_id"], readiness_report_id=row["readiness_report_id"],
+                completion_plan_id=row["completion_plan_id"], peer_review_round_id=row["peer_review_round_id"],
+                section_count=row["section_count"], drafted_section_count=row["drafted_section_count"],
+                citation_count=row["citation_count"], human_decision_count=row["human_decision_count"],
+                package_hash=row["package_hash"], created_at=row["created_at"],
+            )
+            for row in rows
+        ]
+
     def add_readiness_report(self, report: ReadinessReport) -> str:
         self.conn.execute(
             "INSERT INTO readiness_reports "
@@ -507,6 +558,19 @@ class Repository:
         self.conn.commit()
         return report.report_id
 
+    def get_readiness_report(self, project_id: str) -> ReadinessReport | None:
+        row = self.conn.execute(
+            "SELECT * FROM readiness_reports WHERE project_id = ? ORDER BY created_at DESC LIMIT 1", (project_id,)
+        ).fetchone()
+        if row is None:
+            return None
+        return ReadinessReport(
+            report_id=row["report_id"], project_id=row["project_id"], run_id=row["run_id"],
+            readiness_status=row["readiness_status"], audit_ids=json.loads(row["audit_ids"]),
+            finding_ids=json.loads(row["finding_ids"]), blocking_finding_ids=json.loads(row["blocking_finding_ids"]),
+            explanation=row["explanation"], created_at=row["created_at"],
+        )
+
     def add_human_decision(self, decision: HumanDecision) -> str:
         self.conn.execute(
             "INSERT INTO human_decisions "
@@ -517,3 +581,16 @@ class Repository:
         )
         self.conn.commit()
         return decision.decision_id
+
+    def get_human_decisions(self, project_id: str) -> list[HumanDecision]:
+        rows = self.conn.execute(
+            "SELECT * FROM human_decisions WHERE project_id = ? ORDER BY created_at", (project_id,)
+        ).fetchall()
+        return [
+            HumanDecision(
+                decision_id=row["decision_id"], project_id=row["project_id"], run_id=row["run_id"],
+                kind=row["kind"], decision=row["decision"], payload=json.loads(row["payload"]),
+                created_at=row["created_at"],
+            )
+            for row in rows
+        ]

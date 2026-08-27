@@ -170,6 +170,43 @@ default to the same short comment IDs (`COMMENT-1`, `COMMENT-2`, ...), which
 silently overwrote each other in the flat `comments` dict until each
 persona's comment IDs were namespaced.
 
+## Export a release snapshot
+
+Assemble everything a project has actually produced — manuscript plan,
+drafted sections (with undrafted ones noted explicitly), claim/evidence map,
+readiness report, completion plan, peer review (reviewer reports, revision
+history, response-to-reviewers, pulled from the review graph's own
+checkpoint via `get_state`, since the `PeerReviewRound` summary alone doesn't
+carry them), bibliography (if any — see below), findings, and the full
+human-decision approval audit trail — into one Markdown snapshot. Purely
+deterministic, no LLM calls, no new files beyond stdlib `hashlib`:
+
+```bash
+PYTHONPATH=src python -m manuscript_system.cli export-release \
+  --project-id <project_id> [--output ./release/my-release.md]
+```
+
+Deliberately doesn't attempt a cover letter, graphical abstract, supplement,
+rendered LaTeX/DOCX/PDF, or "environment information" — none of that is
+backed by anything real in this codebase (no cover-letter prompt, no image
+generation, no document renderer, no environment-capture); building those
+now would produce empty placeholders, not a real feature. Citations only
+show up if the project actually has any — `evaluate-manuscript` creates
+citations under a *separate* `Project`/`project_id` from the one that goes
+through `intake` → `draft` → `review`, so for that pipeline the bibliography
+section is honestly empty rather than faked. No hard "final gate" check
+before export either — there's no single "done" state across every possible
+path (completion plan vs. manuscript plan vs. full draft+review cycle), so
+the document instead prints current readiness/approval status prominently,
+letting a human see immediately whether it's actually ready.
+
+Closed a real gap found while building this: `cmd_approve_draft`/
+`cmd_approve_review` never called `add_human_decision` the way the
+assessment and manuscript-evaluation human gates already did (their
+underlying node functions are reused unmodified from the ported module and
+don't take a `repo` param), so the approval-audit trail was silently
+incomplete for those two gates. Both now record every resume decision.
+
 ## Evaluate an already-written manuscript
 
 For a complete manuscript that hasn't been submitted yet (LaTeX + bibliography

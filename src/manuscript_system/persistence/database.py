@@ -213,6 +213,21 @@ CREATE TABLE IF NOT EXISTS peer_review_rounds (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS release_candidates (
+    release_id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    manuscript_plan_id TEXT,
+    readiness_report_id TEXT,
+    completion_plan_id TEXT,
+    peer_review_round_id TEXT,
+    section_count INTEGER NOT NULL DEFAULT 0,
+    drafted_section_count INTEGER NOT NULL DEFAULT 0,
+    citation_count INTEGER NOT NULL DEFAULT 0,
+    human_decision_count INTEGER NOT NULL DEFAULT 0,
+    package_hash TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS human_decisions (
     decision_id TEXT PRIMARY KEY,
     project_id TEXT NOT NULL,
